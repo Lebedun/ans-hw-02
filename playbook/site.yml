@@ -1,4 +1,31 @@
 ---
+- name: Install Vector
+  hosts: vector
+  handlers:
+    - name: Start vector service
+      become: true
+      ansible.builtin.service:
+        name: vector
+        state: restarted
+  tasks:
+    - name: Get vector distrib
+      ansible.builtin.get_url:
+        url: "https://packages.timber.io/vector/0.36.0/vector-{{ vector_version }}-1.x86_64.rpm"
+        dest: "./vector-{{ vector_version }}-1.x86_64.rpm"
+        mode: o644
+        validate_certs: false
+    - name: Install vector
+      become: true
+      ansible.builtin.yum:
+        name: vector-{{ vector_version }}-1.x86_64.rpm
+      notify: Start vector service
+    - name: Ensure vector config in place
+      become: true
+      ansible.builtin.template:
+        src: vector.yaml
+        dest: "/etc/vector"
+        mode: o644
+      notify: Start vector service
 - name: Install Clickhouse
   hosts: clickhouse
   handlers:
@@ -7,18 +34,24 @@
       ansible.builtin.service:
         name: clickhouse-server
         state: restarted
+    - name: Pause after restartig clickhouse
+      ansible.builtin.pause:
+        seconds: 5
   tasks:
-    - block:
-        - name: Get clickhouse distrib
+    - name: Get clickhouse distrib
+      block:
+        - name: Get clickhouse distrib noarch
           ansible.builtin.get_url:
             url: "https://packages.clickhouse.com/rpm/stable/{{ item }}-{{ clickhouse_version }}.noarch.rpm"
             dest: "./{{ item }}-{{ clickhouse_version }}.rpm"
+            mode: o644
           with_items: "{{ clickhouse_packages }}"
       rescue:
-        - name: Get clickhouse distrib
+        - name: Get clickhouse distrib x86_64
           ansible.builtin.get_url:
             url: "https://packages.clickhouse.com/rpm/stable/clickhouse-common-static-{{ clickhouse_version }}.x86_64.rpm"
             dest: "./clickhouse-common-static-{{ clickhouse_version }}.rpm"
+            mode: o644
     - name: Install clickhouse packages
       become: true
       ansible.builtin.yum:
@@ -26,11 +59,13 @@
           - clickhouse-common-static-{{ clickhouse_version }}.rpm
           - clickhouse-client-{{ clickhouse_version }}.rpm
           - clickhouse-server-{{ clickhouse_version }}.rpm
-      notify: Start clickhouse service
+      notify:
+        - Start clickhouse service
+        - Pause after restartig clickhouse # Pause because server need some seconds to start before accept first client's command
     - name: Flush handlers
-      meta: flush_handlers
+      ansible.builtin.meta: flush_handlers
     - name: Create database
       ansible.builtin.command: "clickhouse-client -q 'create database logs;'"
       register: create_db
-      failed_when: create_db.rc != 0 and create_db.rc !=82
+      failed_when: create_db.rc != 0 and create_db.rc != 82
       changed_when: create_db.rc == 0
