@@ -4,7 +4,3 @@ clickhouse_packages:
   - clickhouse-client
   - clickhouse-server
   - clickhouse-common-static
-
-vector_version: "0.36.0"
-
-dummy_logs_interval: "2"
