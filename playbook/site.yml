@@ -1,6 +1,6 @@
 ---
 - name: Install Vector
-  hosts: vector
+  hosts: vector-host
   handlers:
     - name: Start vector service
       become: true
@@ -26,8 +26,9 @@
         dest: "/etc/vector"
         mode: o644
       notify: Start vector service
+###########################################################################################
 - name: Install Clickhouse
-  hosts: clickhouse
+  hosts: clickhouse-host
   handlers:
     - name: Start clickhouse service
       become: true
@@ -69,3 +70,50 @@
       register: create_db
       failed_when: create_db.rc != 0 and create_db.rc != 82
       changed_when: create_db.rc == 0
+###########################################################################################
+- name: Install Nginx
+  hosts: lighthouse-host
+  handlers:
+    - name: Start-nginx
+      ansible.builtin.service:
+        name: nginx
+        state: restarted
+  tasks:
+    - name: Epel install
+      become: true
+      ansible.builtin.yum:
+        name: epel-release
+        state: present
+    - name: Nginx install
+      become: true
+      ansible.builtin.yum:
+        name: nginx
+        state: present
+      notify: Start-nginx
+###########################################################################################
+- name: Install Lighthouse
+  hosts: lighthouse-host
+  handlers:
+    - name: Reload-nginx
+      become: true
+      ansible.builtin.command: nginx -s reload
+  pre_tasks:
+    - name: Lighthouse dependences
+      become: true
+      ansible.builtin.yum:
+        name: git
+        state: present
+  tasks:
+    - name: Lighthouse get from git
+      become: true
+      ansible.builtin.git:
+        repo: "{{ lighthouse_vcs }}"
+        version: master
+        dest: "{{ lighthouse_local_dir }}"
+    - name: Lighthouse create config for nginx
+      become: true
+      ansible.builtin.template:
+        src: lighthouse.conf
+        dest: /etc/nginx/conf.d/default.conf
+        mode: o644
+      notify: Reload-nginx

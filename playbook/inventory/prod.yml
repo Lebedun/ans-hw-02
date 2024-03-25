@@ -1,13 +1,19 @@
 ---
 clickhouse:
   hosts:
-    clickhouse-01:
-      ansible_host: 10.128.0.27
+    clickhouse-host:
+      ansible_host: 10.128.0.35
       ansible_user: lebedev
       ansible_ssh_private_key_file: ~/.ssh/4ansible 
 vector:
   hosts:
-    clickhouse-01:
+    vector-host:
       ansible_host: 10.128.0.27
+      ansible_user: lebedev
+      ansible_ssh_private_key_file: ~/.ssh/4ansible
+lighthouse:
+  hosts:
+    lighthouse-host:
+      ansible_host: 10.128.0.21
       ansible_user: lebedev
       ansible_ssh_private_key_file: ~/.ssh/4ansible
